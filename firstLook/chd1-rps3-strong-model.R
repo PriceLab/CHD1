@@ -3,94 +3,28 @@ library(TrenaProjectErythropoiesis)
 library(ghdb)
 library(trena)
 library(rtracklayer)
-
 #------------------------------------------------------------------------------------------------------------------------
-if(!exists("tpee"))
+if(!exists("tpe"))
    tpe <- TrenaProjectErythropoiesis()
 
-if(!exists("igv"))
-    igv <- start.igv("CHD1", "hg38")
-
 tms <- TrenaMultiScore(tpe, "CHD1")
-
 tbl.ghFullRegion <- getGeneHancerRegion(tms)    # 240k
-
 ghdb <- GeneHancerDB()
 tbl.gh <- retrieveEnhancersFromDatabase(ghdb, "CHD1", tissues="all")
 dim(tbl.gh)
 tbl.gh$score <- asinh(tbl.gh$combinedscore)
-track <- DataFrameQuantitativeTrack("GH", tbl.gh[, c("chrom", "start", "end", "score")], color="random", autoscale=TRUE)
-displayTrack(igv, track)
-
+# track <- DataFrameQuantitativeTrack("GH", tbl.gh[, c("chrom", "start", "end", "score")], color="random", autoscale=TRUE)
+#displayTrack(igv, track)
 tbl.atac.merged <- get(load("~/github/TrenaProjectErythropoiesis/inst/extdata/genomicRegions/tbl.atacMerged.RData"))
 tbl.atac.chd1 <- subset(tbl.atac.merged, chrom==tbl.ghFullRegion$chrom &
                                          start >= tbl.ghFullRegion$start &
                                          end <= tbl.ghFullRegion$end)
 dim(tbl.atac.chd1)
-track <- DataFrameAnnotationTrack("atac", tbl.atac.chd1, color="gray")
-displayTrack(igv, track)
+#track <- DataFrameAnnotationTrack("atac", tbl.atac.chd1, color="gray")
+#displayTrack(igv, track)
 
-#----------------------------------------------------------------------------------------------------
-query.ucsc <- function()
-{
-    # browse to https://genome.ucsc.edu/cgi-bin/hgTables
-
-     # H3K4Me1 Mark (Often Found Near Regulatory Elements)
-   tbl.h3k4me1.k562 <- read.table("~/Downloads/tmp (1).tsv", sep="\t", nrow=-1, skip=1, as.is=TRUE)
-   dim(tbl.h3k4me1.k562) # [1] 7020    4
-   track <- DataFrameQuantitativeTrack("h3k4me1.k562", tbl.h3k4me1.k562, autoscale=TRUE, color="random")
-   displayTrack(igv, track)
-
-     # H3K4Me3 Mark (Often Found Near Promoters)
-   tbl.h3k4me3.k562 <- read.table("~/Downloads/tmp (2).tsv", sep="\t", nrow=-1, skip=1, as.is=TRUE)
-   dim(tbl.h3k4me3.k562) # [1] 7020    4
-   track <- DataFrameQuantitativeTrack("h3k4me3.k562", tbl.h3k4me3.k562, autoscale=TRUE, color="random")
-   displayTrack(igv, track)
-
-    # H3K27Ac Mark (Often Found Near Regulatory Elements)
-   tbl.h3k27.k562 <- read.table("~/Downloads/tmp (3).tsv", sep="\t", nrow=-1, skip=1, as.is=TRUE)
-   dim(tbl.h3k27.k562) # [1] 7020    4
-   track <- DataFrameQuantitativeTrack("h3k27.k562", tbl.h3k27.k562, autoscale=TRUE, color="random")
-   displayTrack(igv, track)
-
-   tbl.tfbsClustered <- read.table("~/Downloads/tmp (4).tsv", sep="\t", nrow=-3, skip=1, as.is=TRUE)[, -1]
-   head(tbl.tfbsClustered)
-   dim(tbl.tfbsClustered)
-   track <- DataFrameAnnotationTrack("tfbs", tbl.tfbsClustered[, 1:5], color="random")
-   displayTrack(igv, track)
-
-  session <- browserSession()
-  genome(session) <- "hg38"
-  wdth(80)
-  trackNames <- trackNames(session)
-  length(trackNames) # 141
-
-  roi <- with(getGenomicRegion(igv), GRangesForUCSCGenome("hg38", chrom, IRanges(start, end)))
-  trackName <- "All SNPs(151)"
-  trackName <- "ENCODE Regulation Tracks"
-  trackName <- "wgEncodeRegMarkH3k27ac"
-  trackName <- "encodeCcreCombined"
-  trackName <- "wgEncodeReg"
-  trackName <- "GeneHancer"
-  trackName <- "ORegAnno"
-  trackName <- "oreganno"
-  trackName <- "Hi-C and Micro-C"
-  trackName <- "hicAndMicroC"
-  query <- ucscTableQuery(session, trackName, roi)
-  track.tables <- tableNames(query)
-  tbl.track <- as.data.frame(track(query))
-  colnames(tbl.track)[1] <- "chrom"
-  tbl.track$chrom <- as.character(tbl.track$chrom)
-  igv.track <- DataFrameAnnotationTrack("snps.151", tbl.track[, c("chrom", "start", "end", "name")],
-                                        color="red", trackHeight=25)
-  displayTrack(igv, igv.track)
-
-      ENCODE Regulation...
-             "wgEncodeReg"
-} # query.ucsc
-#----------------------------------------------------------------------------------------------------
-with(tbl.gh, findOpenChromatin(tms, chrom, start, end))
-tbl.oc <- getOpenChromatin(tmse)
+#with(tbl.gh, findOpenChromatin(tms, chrom, start, end))
+tbl.oc <- getOpenChromatin(tms)
 
     #------------------------------------------------
     # build a tf-only model in oc in gh-ish promoter
@@ -141,11 +75,12 @@ tbl.freq <- as.data.frame(sort(table(tbl.fimo$tf), decreasing=TRUE))
        # 8  ZNF76    1
        #--------------------------------------------------
 tfs <- as.character(tbl.freq$Var1)
-for(tf.name in tfs){
-   tbl.tf <- subset(tbl.fimo, tf==tf.name)
-   track <- DataFrameAnnotationTrack(tf.name, tbl.tf, color="blue", trackHeight=25)
-   displayTrack(igv, track)
-   }
+printf("candidate tfs for trena: %d", length(tfs))
+#for(tf.name in tfs){
+#   tbl.tf <- subset(tbl.fimo, tf==tf.name)
+#   track <- DataFrameAnnotationTrack(tf.name, tbl.tf, color="blue", trackHeight=25)
+#   displayTrack(igv, track)
+#   }
 
 solver <- EnsembleSolver(mtx,
                          targetGene="CHD1",
@@ -254,69 +189,4 @@ colnames(tbl.model) <- c("estimate", "stderr", "t.value", "p.value")
 tbl.model.strong <- subset(tbl.model, p.value <= 0.05)
 tbl.model.strong <- tbl.model.strong[order(tbl.model.strong$p.value, decreasing=FALSE),]
 
-
-     #-------------------------------------------------------------
-     # Residuals:
-     #       Min        1Q    Median        3Q       Max
-     # -0.055377 -0.008679  0.003791  0.013276  0.033927
-     #
-     # Coefficients:
-     #              Estimate Std. Error t value Pr(>|t|)
-     # (Intercept)  4.542851   2.056374   2.209  0.06922 .
-     # PATZ1       -0.554474   0.210069  -2.639  0.03857 *
-     # SP3          1.332820   0.371862   3.584  0.01158 *
-     # MAZ          0.855970   0.352949   2.425  0.05150 .
-     # ZNF263       1.886234   0.555905   3.393  0.01462 *
-     # KLF12        0.018279   0.021306   0.858  0.42387
-     # NFKB1        0.177954   0.220481   0.807  0.45040
-     # STAT3        0.238749   0.194260   1.229  0.26508
-     # ZNF76        0.769852   0.322760   2.385  0.05438 .
-     # TRA2A        0.168729   0.267305   0.631  0.55117
-     # SF3B4        0.103942   0.387834   0.268  0.79767
-     # SMNDC1      -0.394985   0.266998  -1.479  0.18953
-     # SF3B1        0.007952   0.379437   0.021  0.98396
-     # RPS3        -1.040891   0.204971  -5.078  0.00227 **  # ribosome protein, and also endonuclease
-     # SLTM         0.221743   0.257923   0.860  0.42296
-     # RBM22       -0.011041   0.209952  -0.053  0.95977
-     # GTF2F1      -0.776679   0.368270  -2.109  0.07948 .
-     # SBDS         0.066047   0.290934   0.227  0.82795
-     # PUM2         0.228439   0.444470   0.514  0.62565
-     # ILF3        -0.872259   0.468243  -1.863  0.11178
-     # DDX3X       -0.746716   0.388909  -1.920  0.10326
-     # LARP4       -0.503798   0.223484  -2.254  0.06506 .
-     # ---
-     # Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
-     #
-     # Residual standard error: 0.03891 on 6 degrees of freedom
-     # Multiple R-squared:  0.9981,	Adjusted R-squared:  0.9917
-     # F-statistic: 153.8 on 21 and 6 DF,  p-value: 1.583e-06
-     #-------------------------------------------------------------
-
-
-                     estimate   std err    tval     pval
-     # RPS3        -1.040891   0.204971  -5.078  0.00227 **
-     # SP3          1.332820   0.371862   3.584  0.01158 *
-     # ZNF263       1.886234   0.555905   3.393  0.01462 *
-     # PATZ1       -0.554474   0.210069  -2.639  0.03857 *
-     # MAZ          0.855970   0.352949   2.425  0.05150 .
-     # ZNF76        0.769852   0.322760   2.385  0.05438 .
-
-
-print(load("~/github/TrenaProjectErythropoiesis/viz/srm.vs.mrna/shinyapps.io/srm.rna.averaged.clean.RData"))
-# mtx.rna, mtx.srm
-dim(mtx.rna) #
-dim(mtx.srm)
-#plot(mtx["RBM22", seq(1, 24, by=2)]-8.6, type="b", col="red")
-plot((mtx["RPS3",seq(1, 24, by=2)]-11.3)/1.8, type="b", col="red", ylim=c(0,1.1), xlim=c(0,14),
-     main="looking for possible RBP modulation of CHD1 protein expression")
-lines(mtx.srm["CHD1",]/8000, type="b", col="blue")
-#plot(((mtx["RPS3", seq(1, 24, by=2)]-8.6)), type="b", col="red")
-legend(2, 0.3, c("mRNA RPS3", "srm CHD1"), c("red", "blue"))
-
-cor(mtx["RPS3",], mtx.srm["CHD1",], method="spearman")
-
-
-system("open 'chd1-proteinLevels-RBM22-mrnaLevels.png'")
-system("open 'CHD1-promoter-igv-with-GH-and-8-tf-binding-sites.png'")
-
-
+print(tbl.model.strong)
